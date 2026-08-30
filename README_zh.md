@@ -4,7 +4,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/MouXiaoJun/mask.svg)](https://pkg.go.dev/github.com/MouXiaoJun/mask)
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8?style=flat-square&logo=go)](https://golang.org)
-[![License](https://img.shields.io/badge/license-MulanPSL--2.0-green.svg?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 [![GitHub release](https://img.shields.io/github/release/MouXiaoJun/mask.svg?style=flat-square)](https://github.com/MouXiaoJun/mask/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/MouXiaoJun/mask?style=flat-square)](https://goreportcard.com/report/github.com/MouXiaoJun/mask)
 
@@ -381,4 +381,4 @@ Go 字符串是 UTF-8 字节序列，一个汉字占 3 个字节。按字节切�
 
 ## License
 
-[MulanPSL-2.0](LICENSE)
+[MIT](LICENSE)

@@ -4,7 +4,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/MouXiaoJun/mask.svg)](https://pkg.go.dev/github.com/MouXiaoJun/mask)
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8?style=flat-square&logo=go)](https://golang.org)
-[![License](https://img.shields.io/badge/license-MulanPSL--2.0-green.svg?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 [![GitHub release](https://img.shields.io/github/release/MouXiaoJun/mask.svg?style=flat-square)](https://github.com/MouXiaoJun/mask/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/MouXiaoJun/mask?style=flat-square)](https://goreportcard.com/report/github.com/MouXiaoJun/mask)
 
@@ -261,12 +261,14 @@ func main() {
 - **Only `string` fields are masked**: non-string fields with a tag are skipped silently — no masking, no error, no false positives.
 - **`mask:"-"` skips everything**, including nested recursion on that field.
 - Unexported fields are skipped.
-- Nil pointers (fields and slice elements) are skipped; never panics.
+- Nil pointers (fields and slice elements) are skipped; nested multi-level struct pointers are supported.
+- Interface-typed fields (including `any` and `[]any` fields) are not dynamically traversed.
+- Cycles and shared references are safe: each typed struct object is visited once per call. A later call applies custom formatters again.
 - Top-level argument must be a struct pointer or a struct slice pointer, else `ErrNotPointer` / `ErrNotStruct`.
 - An unregistered format is an error, not a warning: it surfaces on the first call and keeps failing until registered; other fields are still masked.
 - Registering a format invalidates the type cache — previously masked types rebuild their config on the next call (by design).
-- Concurrency: `Mask` / `MaskOf` are safe to call concurrently; `RegisterMask` is copy-on-write and safe alongside masking, but prefer startup-time registration.
-- Idempotent: already-masked `*` stays `*`, so calling `Mask` again changes nothing; mask once at the boundary in production.
+- Concurrency: `Mask` / `MaskOf` may run concurrently on separate objects; concurrent writes to the same object are not safe. `RegisterMask` is copy-on-write and safe alongside masking, but prefer startup-time registration.
+- Built-in formats preserve already-masked output; custom formatters need not be idempotent. Mask once at the boundary in production.
 
 ## Performance
 
@@ -306,7 +308,7 @@ The family tags never collide: `validate:"required,len=11" mask:"phone"` validat
 
 **5. Does calling `Mask` twice double-mask?**
 
-No. Every built-in format is idempotent on already-masked output: `*` stays `*`, kept head/tail chars are kept again (`138****8000` → `138****8000`). Still, mask once at the boundary for clarity.
+Built-in formats preserve already-masked output: `*` stays `*`, kept head/tail chars are kept again (`138****8000` → `138****8000`). Custom formatters run again on each call and may change the result. Mask once at the boundary for clarity.
 
 ## Changelog
 
@@ -314,4 +316,4 @@ See [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 
-[MulanPSL-2.0](LICENSE)
+[MIT](LICENSE)

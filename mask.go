@@ -137,7 +137,7 @@ func parseKeep(tag string) (head, tail int, ok bool) {
 // elemStruct 判断类型（解引用指针/接口，或切片/数组的元素）最终是否是结构体。
 func elemStruct(t reflect.Type) bool {
 	for t.Kind() == reflect.Ptr || t.Kind() == reflect.Interface {
-		if t.Kind() == reflect.Interface && t.NumMethod() > 0 {
+		if t.Kind() == reflect.Interface {
 			return false
 		}
 		t = t.Elem()
@@ -148,7 +148,7 @@ func elemStruct(t reflect.Type) bool {
 	if t.Kind() == reflect.Slice || t.Kind() == reflect.Array {
 		et := t.Elem()
 		for et.Kind() == reflect.Ptr || et.Kind() == reflect.Interface {
-			if et.Kind() == reflect.Interface && et.NumMethod() > 0 {
+			if et.Kind() == reflect.Interface {
 				return false
 			}
 			et = et.Elem()
@@ -167,9 +167,10 @@ func Mask(v any) error {
 	}
 	elem := rv.Elem()
 	var errs []string
+	seen := make(map[any]struct{})
 	switch elem.Kind() {
 	case reflect.Struct:
-		maskStruct(elem, "", &errs)
+		maskStruct(elem, "", &errs, seen)
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < elem.Len(); i++ {
 			ev := elem.Index(i)
@@ -180,7 +181,7 @@ func Mask(v any) error {
 				ev = ev.Elem()
 			}
 			if ev.Kind() == reflect.Struct {
-				maskStruct(ev, fmt.Sprintf("[%d].", i), &errs)
+				maskStruct(ev, fmt.Sprintf("[%d].", i), &errs, seen)
 			}
 		}
 	default:
@@ -198,7 +199,14 @@ func MaskOf[T any](v *T) error {
 }
 
 // maskStruct 递归脱敏结构体，path 用于错误消息。
-func maskStruct(rv reflect.Value, path string, errs *[]string) {
+func maskStruct(rv reflect.Value, path string, errs *[]string, seen map[any]struct{}) {
+	if rv.CanAddr() {
+		key := rv.Addr().Interface()
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+	}
 	cfg := getConfig(rv.Type())
 	if cfg == nil {
 		return
@@ -207,12 +215,12 @@ func maskStruct(rv reflect.Value, path string, errs *[]string) {
 		*errs = append(*errs, fmt.Sprintf("字段 %s: 格式 %q 未注册", me.field, me.name))
 	}
 	for _, fc := range cfg.fields {
-		maskField(rv.FieldByName(fc.name), fc, path, errs)
+		maskField(rv.FieldByName(fc.name), fc, path, errs, seen)
 	}
 }
 
 // maskField 脱敏单个字段：string 应用格式，嵌套递归。
-func maskField(fv reflect.Value, fc fieldConfig, path string, errs *[]string) {
+func maskField(fv reflect.Value, fc fieldConfig, path string, errs *[]string, seen map[any]struct{}) {
 	fieldName := path + fc.name
 
 	if fc.format != nil {
@@ -228,17 +236,21 @@ func maskField(fv reflect.Value, fc fieldConfig, path string, errs *[]string) {
 	}
 	switch fv.Kind() {
 	case reflect.Struct:
-		maskStruct(fv, fieldName+".", errs)
+		maskStruct(fv, fieldName+".", errs, seen)
 
 	case reflect.Ptr, reflect.Interface:
 		if fv.IsNil() {
 			return
 		}
 		elem := fv.Elem()
+		for elem.Kind() == reflect.Ptr || elem.Kind() == reflect.Interface {
+			if elem.IsNil() {
+				return
+			}
+			elem = elem.Elem()
+		}
 		if elem.Kind() == reflect.Struct {
-			maskStruct(elem, fieldName+".", errs)
-		} else if elem.Kind() == reflect.Ptr && !elem.IsNil() {
-			maskStruct(elem.Elem(), fieldName+".", errs)
+			maskStruct(elem, fieldName+".", errs, seen)
 		}
 
 	case reflect.Slice, reflect.Array:
@@ -251,7 +263,7 @@ func maskField(fv reflect.Value, fc fieldConfig, path string, errs *[]string) {
 				ev = ev.Elem()
 			}
 			if ev.Kind() == reflect.Struct {
-				maskStruct(ev, fmt.Sprintf("%s[%d].", fieldName, i), errs)
+				maskStruct(ev, fmt.Sprintf("%s[%d].", fieldName, i), errs, seen)
 			}
 		}
 	}

@@ -89,7 +89,7 @@ func init() {
 func keepBoth(head, tail int) Formatter {
 	return func(s string) string {
 		r := []rune(s)
-		if len(r) <= head+tail {
+		if head >= len(r) || tail >= len(r)-head {
 			return strings.Repeat("*", len(r))
 		}
 		return string(r[:head]) + strings.Repeat("*", len(r)-head-tail) + string(r[len(r)-tail:])
