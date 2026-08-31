@@ -212,7 +212,7 @@ func maskStruct(rv reflect.Value, path string, errs *[]string, seen map[any]stru
 		return
 	}
 	for _, me := range cfg.errs {
-		*errs = append(*errs, fmt.Sprintf("字段 %s: 格式 %q 未注册", me.field, me.name))
+		*errs = append(*errs, fmt.Sprintf("字段 %s: 格式 %q 未注册", path+me.field, me.name))
 	}
 	for _, fc := range cfg.fields {
 		maskField(rv.FieldByName(fc.name), fc, path, errs, seen)

@@ -1,10 +1,63 @@
 package mask
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 )
+
+func TestMaskUnregisteredFormatPaths(t *testing.T) {
+	type Leaf struct {
+		Secret string `mask:"missing-path-format"`
+	}
+	p := &Leaf{}
+	pp := &p
+	for _, test := range []struct {
+		name  string
+		value any
+		paths []string
+	}{
+		{"root", &Leaf{}, []string{"Secret"}},
+		{"nested", &struct{ Child Leaf }{}, []string{"Child.Secret"}},
+		{"embedded", &struct{ Leaf }{}, []string{"Leaf.Secret"}},
+		{"pointer", &struct{ Child ***Leaf }{&pp}, []string{"Child.Secret"}},
+		{"slice", &struct{ Items []*Leaf }{[]*Leaf{nil, {}, {}}}, []string{"Items[1].Secret", "Items[2].Secret"}},
+		{"array", &struct{ Items [1]Leaf }{}, []string{"Items[0].Secret"}},
+		{"root slice", &[]*Leaf{nil, {}}, []string{"[1].Secret"}},
+		{"root array", &[1]struct{ Child Leaf }{}, []string{"[0].Child.Secret"}},
+		{"shared", &struct{ First, Second *Leaf }{p, p}, []string{"First.Secret"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			messages := make([]string, len(test.paths))
+			for i, path := range test.paths {
+				messages[i] = fmt.Sprintf("字段 %s: 格式 %q 未注册", path, "missing-path-format")
+			}
+			want := "mask: " + strings.Join(messages, "; ")
+			// Repeat to check cached configurations do not retain a traversal path.
+			for i := 0; i < 2; i++ {
+				if err := Mask(test.value); err == nil || err.Error() != want {
+					t.Fatalf("Mask() = %v, want %q", err, want)
+				}
+			}
+		})
+	}
+
+	v := struct {
+		Child struct {
+			Bad  string `mask:"-1,2"`
+			Good string `mask:"*"`
+		}
+	}{}
+	v.Child.Good = "secret"
+	if err := MaskOf(&v); err == nil || err.Error() != `mask: 字段 Child.Bad: 格式 "-1,2" 未注册` {
+		t.Fatalf("invalid keep format = %v", err)
+	}
+	if v.Child.Good != "******" {
+		t.Fatal("valid fields must still be masked when another field has a configuration error")
+	}
+}
 
 func TestMaskRetainCountOverflow(t *testing.T) {
 	max := strconv.Itoa(int(^uint(0) >> 1))

@@ -92,7 +92,8 @@ if err := mask.MaskOf(&user); err != nil {
 }
 ```
 
-Errors are comparable with `errors.Is`:
+Argument errors are comparable with `errors.Is`; configuration errors contain
+field paths and format names:
 
 | Error | When |
 | --- | --- |
@@ -111,9 +112,9 @@ Errors are comparable with `errors.Is`:
 | none | not masked; nested structs (or struct pointers / struct slices) are still recursed |
 
 - Generic parameters must be two non-negative integers separated by a comma (whitespace allowed, e.g. `"3, 4"`). Invalid values become a build-time config error reported on the first `Mask` call.
-- Non-`string` fields with a `mask` tag are skipped silently (no masking, no error); nested struct types are still recursed.
+- Non-`string` fields are not masked; their tags are still validated and nested struct types are still recursed unless skipped with `mask:"-"`.
 - Unexported fields are always skipped.
-- An unregistered format name yields `字段 X: 格式 "y" 未注册` on the first call, for every call until the format is registered (multiple errors joined with `; `). **Other fields are masked normally.**
+- An unregistered format name yields `字段 X: 格式 "y" 未注册` on the first call, for every call until the format is registered (multiple errors joined with `; `). `X` is the full Go field/index path, such as `User.Cards[1].No` or `[0].Phone` for a top-level batch. Shared objects report the first visited path only. **Other fields are masked normally; an error does not roll back partial writes.**
 
 ## Built-in formats
 
@@ -258,7 +259,7 @@ func main() {
 ## Edge cases & limitations
 
 - **In-place semantics**: `Mask` mutates the struct you pass — it returns no copy. Copy first if you need the original (a value copy or via `copier`).
-- **Only `string` fields are masked**: non-string fields with a tag are skipped silently — no masking, no error, no false positives.
+- **Only `string` fields are masked**: non-string values are unchanged, but invalid tags still produce configuration errors.
 - **`mask:"-"` skips everything**, including nested recursion on that field.
 - Unexported fields are skipped.
 - Nil pointers (fields and slice elements) are skipped; nested multi-level struct pointers are supported.
@@ -311,6 +312,10 @@ The family tags never collide: `validate:"required,len=11" mask:"phone"` validat
 Built-in formats preserve already-masked output: `*` stays `*`, kept head/tail chars are kept again (`138****8000` → `138****8000`). Custom formatters run again on each call and may change the result. Mask once at the boundary for clarity.
 
 ## Changelog
+
+Maintenance stays focused on the existing struct-tag masking API, diagnostics,
+and Go compatibility, not database anonymization. CI covers Go 1.21.0, 1.25.x
+and stable with build, vet, full tests, race, coverage and short fuzz runs.
 
 See [CHANGELOG.md](./CHANGELOG.md).
 

@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Include the full nested Go field/index path in configuration errors, preserving
+  first-visit semantics for shared objects and partial masking on errors.
+
 ## [1.0.0] - 2026-02-XX
 
 ### Added

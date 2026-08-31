@@ -6,13 +6,20 @@ on:
   pull_request:
     branches: [ main, master ]
 
+permissions:
+  contents: read
+
+env:
+  GOWORK: "off"
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     strategy:
       matrix:
-        go-version: [1.21, 1.25] # 最低要求 + 较新版本
+        go-version: ["1.21.0", "1.25.x", "stable"] # 最低要求 + 较新版本
       fail-fast: false
 
     steps:
@@ -24,14 +31,25 @@ jobs:
         go-version: ${{ matrix.go-version }}
         cache: false
 
+    - name: Format check
+      run: |
+        unformatted=$(gofmt -l .)
+        if [ -n "$unformatted" ]; then
+          printf '%s\n' "$unformatted"
+          exit 1
+        fi
+
     - name: Vet
       run: go vet ./...
 
     - name: Build
       run: go build ./...
 
+    - name: Test
+      run: go test -count=1 ./...
+
     - name: Test (race + coverage)
-      run: go test -race -coverprofile=coverage.out ./...
+      run: go test -race -count=1 -coverprofile=coverage.out ./...
 
     - name: Fuzz keep parse (short)
       run: go test -run xxx -fuzz FuzzParseKeep -fuzztime 10s ./
